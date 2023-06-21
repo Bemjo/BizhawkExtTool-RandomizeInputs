@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "BizhawkRandomizeInput": {
+      "commandName": "Executable",
+      "executablePath": "C:\\Users\\Ben\\source\\repos\\BizhawkRandomizeInputs\\BizHawk\\EmuHawk.exe",
+      "commandLineArgs": "--open-ext-tool-dll=BizhawkRandomizeInputs",
+      "workingDirectory": "C:\\Users\\Ben\\source\\repos\\BizhawkRandomizeInputs\\BizHawk",
+      "nativeDebugging": true
+    }
+  }
+}

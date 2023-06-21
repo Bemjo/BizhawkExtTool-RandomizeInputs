@@ -1,0 +1,62 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<LangVersion>10.0</LangVersion>
+		<Nullable>enable</Nullable>
+		<TargetFramework>net48</TargetFramework>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <RootNamespace>BizhawkRandomizeInputs</RootNamespace>
+    <AssemblyName>BizhawkRandomizeInputs</AssemblyName>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+	  <DefineConstants>DEBUG;TRACE</DefineConstants>
+	  <Optimize>False</Optimize>
+	</PropertyGroup>
+  <PropertyGroup Condition=" '$(BIZHAWK_DATA_HOME)' == '' ">
+    <BIZHAWK_DATA_HOME>$(ProjectDir)../BizHawk/</BIZHAWK_DATA_HOME>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <!-- if building EmuHawk from source, point to $(ProjectDir)../BizHawk/output/ -->
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <Optimize>True</Optimize>
+  </PropertyGroup>
+
+	<ItemGroup>
+    <PackageReference Include="HotkeyListener" Version="1.9.0" />
+    <PackageReference Include="Lib.Harmony" Version="2.2.2" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <Reference Include="BizHawk.Bizware.BizwareGL">
+      <HintPath>..\BizHawk\dll\BizHawk.Bizware.BizwareGL.dll</HintPath>
+    </Reference>
+    <Reference Include="BizHawk.Bizware.DirectX">
+      <HintPath>..\BizHawk\dll\BizHawk.Bizware.DirectX.dll</HintPath>
+    </Reference>
+    <Reference Include="BizHawk.Bizware.OpenTK3">
+      <HintPath>..\BizHawk\dll\BizHawk.Bizware.OpenTK3.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="BizHawk.Client.Common" HintPath="$(BIZHAWK_DATA_HOME)dll/BizHawk.Client.Common.dll" />
+    <Reference Include="BizHawk.Client.EmuHawk" HintPath="$(BIZHAWK_DATA_HOME)EmuHawk.exe" />
+    <Reference Include="BizHawk.Common" HintPath="$(BIZHAWK_DATA_HOME)dll/BizHawk.Common.dll" />
+		<Reference Include="BizHawk.Emulation.Common" HintPath="$(BIZHAWK_DATA_HOME)dll\BizHawk.Emulation.Common.dll" />
+		<Reference Include="BizHawk.WinForms.Controls" HintPath="$(BIZHAWK_DATA_HOME)dll/BizHawk.WinForms.Controls.dll" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Compile Update="Properties\Settings.Designer.cs">
+	    <DesignTimeSharedInput>True</DesignTimeSharedInput>
+	    <AutoGen>True</AutoGen>
+	    <DependentUpon>Settings.settings</DependentUpon>
+	  </Compile>
+	</ItemGroup>
+
+	<ItemGroup>
+	  <None Update="Properties\Settings.settings">
+	    <Generator>SettingsSingleFileGenerator</Generator>
+	    <LastGenOutput>Settings.Designer.cs</LastGenOutput>
+	  </None>
+	</ItemGroup>
+	<Target Name="PostBuild" AfterTargets="PostBuildEvent">
+		<Copy SourceFiles="$(OutputPath)$(MSBuildProjectName).dll" DestinationFolder="$(BIZHAWK_DATA_HOME)ExternalTools" />
+	</Target>
+</Project>
