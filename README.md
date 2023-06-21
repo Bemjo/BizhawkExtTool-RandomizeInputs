@@ -1,1 +1,1 @@
-Simple socket communication tool for Bizhawk
+Input Randomization Tool for Bizhawk
