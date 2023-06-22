@@ -13,6 +13,7 @@
 	</PropertyGroup>
   <PropertyGroup Condition=" '$(BIZHAWK_DATA_HOME)' == '' ">
     <BIZHAWK_DATA_HOME>$(ProjectDir)../BizHawk/</BIZHAWK_DATA_HOME>
+    <ZIP_RELEASE_PATH>Packaged/Release.zip</ZIP_RELEASE_PATH>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <!-- if building EmuHawk from source, point to $(ProjectDir)../BizHawk/output/ -->
   </PropertyGroup>
@@ -58,5 +59,7 @@
 	</ItemGroup>
 	<Target Name="PostBuild" AfterTargets="PostBuildEvent">
 		<Copy SourceFiles="$(OutputPath)$(MSBuildProjectName).dll" DestinationFolder="$(BIZHAWK_DATA_HOME)ExternalTools" />
+    <Delete Files="$(BIZHAWK_DATA_HOME)$(ZIP_RELEASE_PATH)" />
+    <Exec WorkingDirectory="$(BIZHAWK_DATA_HOME)" Command="7z a -mx9 $(ZIP_RELEASE_PATH) ExternalTools/$(MSBuildProjectName).dll dll/0Harmony.dll dll/HotkeyListener.dll" />
 	</Target>
 </Project>
