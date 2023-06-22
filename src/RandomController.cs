@@ -21,6 +21,8 @@ namespace BizhawkRandomizeInputs
         public int ControllerCount { get; private set; }
 
 
+
+
         public RandomController(IReadOnlyList<IReadOnlyList<string>> ButtonList)
         {
             ButtonsPerController = ButtonList;
@@ -39,7 +41,7 @@ namespace BizhawkRandomizeInputs
         public IReadOnlyDictionary<string, string>? Remappings(int controller)
         {
             if (controller < 0 || controller > RemappedInputs.Count)
-                return null;
+                throw new IndexOutOfRangeException();
 
             return RemappedInputs[controller];
         }
@@ -49,7 +51,7 @@ namespace BizhawkRandomizeInputs
         public void SetButtonRandomizeAllowed(int Controller, string Button, bool bRandomize)
         {
             if (Controller < 0 || Controller >= ButtonsPerController.Count)
-                return;
+                throw new IndexOutOfRangeException();
 
             var dict = AllowedToRandomize[Controller];
 
@@ -62,7 +64,7 @@ namespace BizhawkRandomizeInputs
         public void SetButtonRandomizeAllowed(int controller, Dictionary<string, bool> randomSettings)
         {
             if (controller < 0 || controller >= ButtonsPerController.Count)
-                return;
+                throw new IndexOutOfRangeException();
 
             foreach (var kvp in randomSettings)
             {
@@ -72,9 +74,15 @@ namespace BizhawkRandomizeInputs
 
 
 
-        public void ResetMapping(int controller)
+        public void ResetMapping(int controllerIndex)
         {
+            if (controllerIndex < 0 || controllerIndex >= ButtonsPerController.Count)
+                throw new IndexOutOfRangeException();
 
+            var controller = ButtonsPerController[controllerIndex];
+            var NeutralMappings = new Dictionary<string, string>(controller.ToDictionary(x => x, x => x));
+
+            RemappedInputs.Add(NeutralMappings);
         }
 
 
@@ -112,21 +120,12 @@ namespace BizhawkRandomizeInputs
             {
                 List<string> enabledButtons = AllowedToRandomize[ControllerIndex].Where(kvp => kvp.Value).Select(kvp => kvp.Key).ToList();
 
-                var Remappings = RemappedInputs[ControllerIndex];
+                Dictionary<string, string> NewMappings = enabledButtons.Zip(ThreadSafeRandom.RandomizeList(enabledButtons, EnsureUnique), (k, v) => new { k, v }).ToDictionary(x => x.k, x => x.v);
 
-                List<string> GrabBag = new List<string>(enabledButtons);
+                Dictionary<string, string> Remappings = RemappedInputs[ControllerIndex];
 
-                string[] Keys = enabledButtons.ToArray();
-
-                for (int ButtonIndex = 0; ButtonIndex < Keys.Length; ++ButtonIndex)
-                {
-                    var Button = Keys[ButtonIndex];
-
-                    int i = Generator.Next(0, GrabBag.Count);
-                    Remappings[Button] = GrabBag.ElementAt(i);
-
-                    GrabBag.RemoveAt(i);
-                }
+                // Merge dictionaries, keeping original control order
+                RemappedInputs[ControllerIndex] = Remappings.Select(kvp => NewMappings.TryGetValue(kvp.Key, out string value) ? new KeyValuePair<string, string>(kvp.Key, value) : kvp).ToDictionary(x => x.Key, x => x.Value);
             }
 
             RecreateFlatMapping();

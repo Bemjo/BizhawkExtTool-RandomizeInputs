@@ -8,12 +8,13 @@ using System.Windows.Forms;
 using System.IO;
 using Newtonsoft.Json;
 using WK.Libraries.HotkeyListenerNS;
+
 namespace BizhawkRandomizeInputs
 {
 	[ExternalTool("BizhawkRandomizeInputs")]
     public partial class BizhawkRandomizeInputs : ToolFormBase, IExternalToolForm
 	{
-        static public readonly string ConfigFilePath = "randominputs.json";
+        static public readonly string ConfigFilePath = "ExternalTools/randominputs.json";
 
 		protected override string WindowTitleStatic => "Randomize Inputs";
         public ApiContainer? _maybeAPIContainer { get; set; }
@@ -26,8 +27,6 @@ namespace BizhawkRandomizeInputs
         private List<CheckedListBox> PlayerControlsAllowedLists = new List<CheckedListBox>();
         private List<ListView> PlayersRemappedControlList = new List<ListView>();
 
-        private Dictionary<string, List<Dictionary<string, bool>>>? ConfigEntries = null;
-
         public RandomController? ControllerButtons = null;
 
         private HotkeyListener hkl;
@@ -35,17 +34,21 @@ namespace BizhawkRandomizeInputs
         private Hotkey randomizeHotkey;
         private Hotkey resetHotkey;
 
-        private bool bRandomized = false;
 
-        private string RandomizeHotkeyString = "Control+Shift+R";
-        private string ResetHotkeyString = "Control+Shift+T";
 
         private class ConfigObj
         {
-            string ResetHotkey = "Control+Shift+R";
-            string RandomizeHotkey = "Control+Shift+T";
-            Dictionary<string, List<Dictionary<string, bool>>>? SystemControllerButtonRandomizerWhitelist = null;
+            public string ResetHotkey = "Control, Shift + T";
+            public string RandomizeHotkey = "Control, Shift + R";
+            public bool bUniqueRandom = false;
+            public Dictionary<string, List<Dictionary<string, bool>>>? SystemControllerButtonRandomizerWhitelist = null;
         }
+
+
+
+        private ConfigObj SaveData;
+        private bool bLoaded = false;
+
 
         public BizhawkRandomizeInputs()
         {
@@ -55,29 +58,25 @@ namespace BizhawkRandomizeInputs
 
             InitializeComponent();
 
-            LoadJSONConfig();
+            SaveData = LoadJSONConfig(ConfigFilePath);
+
+            checkBox_UniqueRandom.Checked = SaveData.bUniqueRandom;
 
             hkl = new HotkeyListener();
             hks = new HotkeySelector();
 
-            randomizeHotkey = new Hotkey(RandomizeHotkeyString);
-            resetHotkey = new Hotkey(ResetHotkeyString);
+            randomizeHotkey = new Hotkey(SaveData.RandomizeHotkey);
+            resetHotkey = new Hotkey(SaveData.ResetHotkey);
 
             hkl.Add(new[] { randomizeHotkey, resetHotkey });
 
             hkl.HotkeyPressed += HandleHotkeys;
+            hkl.HotkeyUpdated += HandleHotkeyUpdate;
 
-            hks.Enable(textBox_RandomizeHotkey, randomizeHotkey);
-            hks.Enable(textBox_ResetHotkey, resetHotkey);
-        }
+            hks.Set(textBox_RandomizeHotkey, randomizeHotkey);
+            hks.Set(textBox_ResetHotkey, resetHotkey);
 
-
-
-        ~BizhawkRandomizeInputs()
-        {
-            hkl.RemoveAll();
-            //BuildConfigEntries();
-            SaveJSONConfig();
+            bLoaded = true;
         }
 
 
@@ -92,43 +91,57 @@ namespace BizhawkRandomizeInputs
 
 
 
+        private void HandleHotkeyUpdate(object sender, HotkeyListener.HotkeyUpdatedEventArgs e)
+        {
+            if (e.UpdatedHotkey == randomizeHotkey)
+            {
+                SaveData.RandomizeHotkey = HotkeyListener.Convert(e.NewHotkey);
+                SaveJSONConfig(SaveData, ConfigFilePath);
+            }
+            else if (e.UpdatedHotkey == resetHotkey)
+            {
+                SaveData.ResetHotkey = HotkeyListener.Convert(e.NewHotkey);
+                SaveJSONConfig(SaveData, ConfigFilePath);
+            }
+        }
+
+
+
         private void BuildConfigEntries()
         {
-            if (ConfigEntries != null)
-            {
-                if (ConfigEntries.ContainsKey(SystemName))
-                    ConfigEntries[SystemName].Clear();
-            }
-            else
-            {
-                ConfigEntries = new Dictionary<string, List<Dictionary<string, bool>>>();
-            }
-        }
-
-
-
-        private void LoadJSONConfig()
-        {
-            if (!File.Exists(ConfigFilePath))
+            if (ControllerButtons == null)
                 return;
-
-            using (StreamReader r = new StreamReader(ConfigFilePath))
-            {
-                string json = r.ReadToEnd();
-                ConfigEntries = JsonConvert.DeserializeObject<Dictionary<string, List<Dictionary<string, bool>>>>(json);
-            }
         }
 
 
 
-        private void SaveJSONConfig()
+        private ConfigObj LoadJSONConfig(string filePath)
         {
-            if (ConfigEntries != null && ConfigEntries.Count > 0)
+            ConfigObj? config = null;
+
+            if (filePath.Length > 0)
             {
-                using (StreamWriter w = new StreamWriter(ConfigFilePath, false))
+                using (FileStream file = File.Exists(filePath) ? File.OpenRead(filePath) : File.Create(filePath))
                 {
-                    JsonConvert.SerializeObject(ConfigEntries);
+                    using (StreamReader r = new StreamReader(file))
+                    {
+                        string json = r.ReadToEnd();
+                        config = JsonConvert.DeserializeObject<ConfigObj>(json);
+                    }
                 }
+            }
+
+            return config != null ? config : new ConfigObj();
+        }
+
+
+
+        private void SaveJSONConfig(ConfigObj obj, string filePath)
+        {
+            using (StreamWriter w = new StreamWriter(filePath, false))
+            {
+                string json = JsonConvert.SerializeObject(obj, Formatting.Indented);
+                w.Write(json);
             }
         }
 
@@ -312,8 +325,6 @@ namespace BizhawkRandomizeInputs
                 ControllerButtons.RandomizeMappings(checkBox_UniqueRandom.Checked);
                 ResetRemappingList();
 
-                bRandomized = true;
-
                 button_ResetControls.Enabled = true;
             }
         }
@@ -325,7 +336,6 @@ namespace BizhawkRandomizeInputs
             ControllerButtons?.ResetMappings();
             ResetRemappingList();
             button_ResetControls.Enabled = false;
-            bRandomized = false;
         }
         
 
@@ -343,27 +353,112 @@ namespace BizhawkRandomizeInputs
         }
 
 
-        public bool ValidateHotkey(TextBox? textbox, out string HotkeyText)
+
+        private bool ValidateHotkeyText(string text)
         {
-            HotkeyText = (textbox == null) ? "" : textbox.Text;
-            return textbox != null && !textbox.Text.Contains("None") && !textbox.Text.Contains("Unsupported");
+            return text.Length > 0 &&
+                !text.Contains("None") && 
+                !text.Contains("Unsupported");
         }
+
 
 
         private void textBox_RandomizeHotkey_TextChanged(object sender, EventArgs e)
         {
-            if (ValidateHotkey(sender as TextBox, out string text))
+            if (bLoaded && ValidateHotkeyText(textBox_RandomizeHotkey.Text))
             {
-                hkl.Update(ref randomizeHotkey, HotkeyListener.Convert(text));
+                hkl.Update(ref randomizeHotkey, HotkeyListener.Convert(textBox_RandomizeHotkey.Text));
+                //hks.Disable(textBox_RandomizeHotkey, false);
+                DisableRandomizeHotkeyListening(false);
             }
         }
 
+
+
         private void textBox_ResetHotkey_TextChanged(object sender, EventArgs e)
         {
-            if (ValidateHotkey(sender as TextBox, out string text))
+            if (bLoaded && ValidateHotkeyText(textBox_ResetHotkey.Text))
             {
-                hkl.Update(ref resetHotkey, HotkeyListener.Convert(text));
+                hkl.Update(ref resetHotkey, HotkeyListener.Convert(textBox_ResetHotkey.Text));
+                //hks.Disable(textBox_ResetHotkey, false);
+                DisableReseteHotkeyListening(false);
             }
+        }
+
+
+
+        private void button_ChangeRandomizeHotkey_Click(object sender, EventArgs e)
+        {
+            hks.Enable(textBox_RandomizeHotkey);
+            textBox_RandomizeHotkey.Focus();
+
+            button_ChangeRandomizeHotkey.Text = "Cancel";
+            button_ChangeRandomizeHotkey.Click -= button_ChangeRandomizeHotkey_Click;
+            button_ChangeRandomizeHotkey.Click += button_cancelChangeRandomizeHotkey_Click;
+        }
+
+
+
+        private void DisableRandomizeHotkeyListening(bool resetText)
+        {
+            hks.Disable(textBox_RandomizeHotkey, false);
+
+            if (resetText)
+                hks.Set(textBox_RandomizeHotkey, randomizeHotkey);
+
+            button_ChangeRandomizeHotkey.Text = "Change";
+            button_ChangeRandomizeHotkey.Click -= button_cancelChangeRandomizeHotkey_Click;
+            button_ChangeRandomizeHotkey.Click += button_ChangeRandomizeHotkey_Click;
+        }
+
+
+
+        private void DisableReseteHotkeyListening(bool resetText)
+        {
+            hks.Disable(textBox_ResetHotkey, false);
+
+            if (resetText)
+                hks.Set(textBox_ResetHotkey, resetHotkey);
+
+            button_ChangeResetHotkey.Text = "Change";
+            button_ChangeResetHotkey.Click -= button_cancelChangeResetHotkey_Click;
+            button_ChangeResetHotkey.Click += button_ChangeResetHotkey_Click;
+        }
+
+
+
+        private void button_ChangeResetHotkey_Click(object sender, EventArgs e)
+        {
+            hks.Enable(textBox_ResetHotkey);
+            textBox_ResetHotkey.Focus();
+
+            button_ChangeResetHotkey.Text = "Cancel";
+            button_ChangeResetHotkey.Click -= button_ChangeResetHotkey_Click;
+            button_ChangeResetHotkey.Click += button_cancelChangeResetHotkey_Click;
+        }
+
+
+
+        private void button_cancelChangeRandomizeHotkey_Click(object sender, EventArgs e)
+        {
+            DisableRandomizeHotkeyListening(true);
+        }
+
+
+
+        private void button_cancelChangeResetHotkey_Click(object sender, EventArgs e)
+        {
+            DisableReseteHotkeyListening(true);
+        }
+
+
+
+        private void checkBox_UniqueRandom_CheckedChanged(object sender, EventArgs e)
+        {
+            var cb = sender as CheckBox;
+
+            SaveData.bUniqueRandom = cb?.Checked ?? false;
+            SaveJSONConfig(SaveData, ConfigFilePath);
         }
     }
 }
